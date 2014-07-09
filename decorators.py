@@ -154,7 +154,7 @@ def jsonp(callback):
         body = callback(*args, **kwargs)
         try:
             body = json.dumps(body)
-            # Set content type only if serialization succesful
+            # Set content type only if serialization successful
             response.content_type = 'application/json'
         except Exception, e:
             return body
@@ -191,5 +191,3 @@ def memoize(f):
         def __get__(self, obj, objtype):
             return functools.partial(self.__call__, obj)
     return memodict(f)
-    
-    
