@@ -11,11 +11,26 @@ import time, binascii, hashlib, email.utils, functools, json, cProfile
 import logging
 from utils import tb
 
-from redis import StrictRedis as Redis
+# Allow importing even when Redis bindings aren't present
+try:
+    from redis import StrictRedis as Redis
+except ImportError:
+    pass
 
 log = logging.getLogger()
 
 gmt_format_string = "%a, %d %b %Y %H:%M:%S GMT"
+
+
+class CustomEncoder(json.JSONEncoder):
+    """Custom encoder that serializes datetimes into JS-compliant times"""
+
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            epoch = datetime.utcfromtimestamp(0)
+            delta = obj - epoch
+            return int(delta.total_seconds()) * 1000
+        return json.JSONEncoder.default(self, obj)
 
 
 def cache_redis(r, prefix='url', ttl=3600):
@@ -153,7 +168,7 @@ def jsonp(callback):
     def wrapper(*args, **kwargs):
         body = callback(*args, **kwargs)
         try:
-            body = json.dumps(body)
+            body = json.dumps(body, cls=CustomEncoder)
             # Set content type only if serialization successful
             response.content_type = 'application/json'
         except Exception, e:
