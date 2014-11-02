@@ -7,25 +7,24 @@ Description: In-process job management
 License: MIT (see LICENSE.md for details)
 """
 
-from Queue import Empty
-from Queue import PriorityQueue
+from Queue import Empty, Queue, PriorityQueue
 from collections import defaultdict
 from functools import partial
 import logging
 import multiprocessing
-from threading import Semaphore
-from threading import Thread
+from threading import Semaphore, Thread
 import time
 import traceback
 from uuid import uuid4
 
-from cPickle import dumps
-from cPickle import loads
+from cPickle import dumps, loads
 
 log = logging.getLogger(__name__)
 
 default_priority = 0
 max_workers = multiprocessing.cpu_count() * 2
+channels = {}
+closed = {}
 
 class Pool:
     """Represents a thread pool"""
@@ -73,7 +72,7 @@ class Pool:
 
         while self._tick():
             # spawn more threads to fill free slots
-            log.warn("Running %d/%d threads" % (len(self.threads),self.max_workers))
+            log.debug("Running %d/%d threads" % (len(self.threads),self.max_workers))
             if len(self.threads) < self.max_workers:
                 log.debug("Queue Length: %d" % self.queue.qsize())
                 try:
@@ -81,6 +80,7 @@ class Pool:
                 except Empty:
                     continue
                 f, uuid, retries, args, kwargs = loads(data)
+                log.debug(f)
                 t = Thread(target=run_task, args=[priority, f, uuid, retries, args, kwargs])
                 t.setDaemon(True)
                 self.threads.append(t)
@@ -148,6 +148,48 @@ def task(func=None, pool=None, max_retries=0, priority=default_priority):
     func.delay = delay
     func.pool = pool
     return func
+
+
+def go(*args, **kwargs):
+    """Queue up a function, Go-style"""
+    uuid = str(uuid4()) # one for each task
+    default_pool.queue.put((default_priority,dumps((args[0], uuid, 0, args[1:], kwargs))))
+    return Deferred(default_pool, uuid)
+
+
+class Channel:
+    """A serializable shim that proxies to a Queue object"""
+    def __init__(self, size, pool=default_pool):
+        self.uuid = str(uuid4()) # one for each task
+        self.pool = pool
+        channels[self.uuid] = Queue(size)
+
+    def recv(self):
+        return channels[self.uuid].get()
+
+    def send(self, item):
+        if self.uuid in closed:
+            raise RuntimeError("Channel is closed.")
+        channels[self.uuid].put(item)
+
+    def close(self):
+        closed[self.uuid] = True
+
+    def __iter__(self):
+        yield self.recv()
+        while True:
+            try:
+                res = channels[self.uuid].get(True, 1.0/self.pool.rate_limit)
+                yield res
+            except Empty:
+                # check channel again and end iteration if closed
+                if channels[self.uuid].empty() and (self.uuid in closed):
+                    return
+
+
+def chan(size = 0, pool=default_pool):
+    """Return a shim that acts like a Go channel"""
+    return Channel(size, pool)
 
 
 def start(daemonize = False):
