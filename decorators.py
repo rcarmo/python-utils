@@ -7,7 +7,7 @@ Created by: Rui Carmo
 """
 
 from bottle import request, response, route, abort
-import time, binascii, hashlib, email.utils, functools, json, cProfile
+import time, binascii, hashlib, email.utils, functools, json, cProfile, collections
 from datetime import datetime
 import logging
 from utils import tb
@@ -207,3 +207,26 @@ def memoize(f):
         def __get__(self, obj, objtype):
             return functools.partial(self.__call__, obj)
     return memodict(f)
+
+
+def lru_cache(limit=100):
+    """Least-recently-used cache decorator"""
+
+    def inner_function(callback):
+        cache = collections.OrderedDict()
+
+        @functools.wraps(callback)
+        def wrapper(*args, **kwargs):
+            key = args
+            if kwargs:
+                key += tuple(sorted(kwargs.items()))
+            try:
+                result = cache.pop(key)
+            except KeyError:
+                result = callback(*args, **kwargs)
+                if len(cache) >= limit:
+                    cache.popitem(0)
+            cache[key] = result # refresh position
+            return result
+        return wrapper
+    return inner_function
