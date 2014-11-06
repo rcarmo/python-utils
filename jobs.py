@@ -36,6 +36,7 @@ class Pool:
         self.queue       = PriorityQueue()
         self.threads     = []
         self.rate_limit  = rate_limit
+        self.running     = True
 
     def _tick(self):
         time.sleep(1.0/self.rate_limit)
@@ -72,7 +73,7 @@ class Pool:
         while self._tick():
             # spawn more threads to fill free slots
             log.debug("Running %d/%d threads" % (len(self.threads),self.max_workers))
-            if len(self.threads) < self.max_workers:
+            if self.running and len(self.threads) < self.max_workers:
                 log.debug("Queue Length: %d" % self.queue.qsize())
                 try:
                     priority, data = self.queue.get(True, 1.0/self.rate_limit)
@@ -89,15 +90,15 @@ class Pool:
             t.join()
 
 
-    def kill_all():
+    def kill_all(self):
         """Very hacky way to kill threads by tossing an exception into their state"""
         for t in self.threads:
             ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(t.ident), ctypes.py_object(SystemExit))
-            time.sleep(0.1)
 
 
     def stop(self):
         """Flush the job queue"""
+        self.running = False
         self.queue = PriorityQueue()
 
 
@@ -205,5 +206,4 @@ def halt(signal, frame):
 
 def start(daemonize = False):
     signal(SIGINT, halt)
-    signal(SIGTERM, halt)
     default_pool.start(daemonize = daemonize)
