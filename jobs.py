@@ -10,8 +10,8 @@ License: MIT (see LICENSE.md for details)
 from Queue import Empty, Queue, PriorityQueue
 from collections import defaultdict
 from functools import partial
-from signal import signal, SIGINT, SIGTERM
-import logging 
+from signal import signal, SIGINT, SIGTERM, SIGHUP
+import sys, logging 
 from threading import Semaphore, Thread
 import time, traceback, ctypes
 from uuid import uuid4
@@ -202,8 +202,10 @@ def chan(size = 0, pool=default_pool):
 def halt(signal, frame):
     default_pool.stop()
     default_pool.kill_all()
+    sys.exit()
 
 
 def start(daemonize = False):
     signal(SIGINT, halt)
+    signal(SIGTERM, halt)
     default_pool.start(daemonize = daemonize)
