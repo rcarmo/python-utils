@@ -166,9 +166,8 @@ def go(*args, **kwargs):
 
 class Channel:
     """A serializable shim that proxies to a Queue object"""
-    def __init__(self, size, pool=default_pool):
+    def __init__(self, size):
         self.uuid = str(uuid4()) # one for each task
-        self.pool = pool
         channels[self.uuid] = Queue(size)
 
     def recv(self):
@@ -186,7 +185,7 @@ class Channel:
         yield self.recv()
         while True:
             try:
-                res = channels[self.uuid].get(True, 1.0/self.pool.rate_limit)
+                res = channels[self.uuid].get(True, 1.0/default_pool.rate_limit)
                 yield res
             except Empty:
                 # check channel again and end iteration if closed
@@ -194,9 +193,9 @@ class Channel:
                     return
 
 
-def chan(size = 0, pool=default_pool):
+def chan(size = 0):
     """Return a shim that acts like a Go channel"""
-    return Channel(size, pool)
+    return Channel(size)
 
 
 def halt(signal, frame):
