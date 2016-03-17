@@ -59,3 +59,8 @@ def convert_html(buffer):
 def munge_string(buffer):
     """Builds anchor IDs"""
     return re.sub("[\W+]", "-", buffer.lower())
+    
+    
+def remove_diacritics(buffer):
+    """Remove diactritical marks in Latin characters"""
+    unicodedata.normalize('NFKD', unicode(buffer)).encode('ASCII', 'ignore')
