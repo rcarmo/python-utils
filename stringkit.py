@@ -11,6 +11,7 @@ import sys
 import re
 import logging
 import htmlentitydefs
+import unicodedata
 
 log = logging.getLogger()
 
