@@ -10,7 +10,7 @@ from bottle import request, response, route, abort
 import time, binascii, hashlib, email.utils, functools, json, cProfile, collections
 from datetime import datetime
 import logging
-from utils import tb
+from core import tb
 
 # Allow importing even when Redis bindings aren't present
 try:
